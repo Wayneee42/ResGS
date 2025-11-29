@@ -41,8 +41,9 @@ def loadCam(args, id, cam_info, resolution_scales,resize_to_original=True):
 
         scale = float(global_down) * float(1.0)
         resolution = (int(orig_w / scale), int(orig_h / scale))
-
-    resized_image_rgb = PILtoTorch(cam_info.image, resolution)
+    
+    # PIL image转为torch后，[w, h, c]变为[c, h, w]，且像素值由[0,255]变成了[0,1]。
+    resized_image_rgb = PILtoTorch(cam_info.image, resolution) 
 
     gt_image = resized_image_rgb[:3, ...]
     downed_image = gt_image.permute(1, 2, 0).cpu().numpy()
@@ -53,8 +54,9 @@ def loadCam(args, id, cam_info, resolution_scales,resize_to_original=True):
     last_resolution=0
     for i in range(resolution_scales[0] + 1):
         if i in resolution_scales:
-            if resize_to_original:
+            if resize_to_original: # 若为True则无论什么阶段，均采用原分辨率图像作为ground_truth图像进行比对。
                 uped_resized_image=downed_image
+                # 循环逐级回到原分辨率图像
                 for j in range(1,i+1):
                     cur_size=size_list[-j]
                     uped_resized_image=cv.pyrUp(uped_resized_image,dstsize=(cur_size[1],cur_size[0]))
