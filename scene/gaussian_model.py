@@ -481,18 +481,22 @@ class GaussianModel:
         self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation, new_level)
 
 
-
+    # 子阶段阈值调整、包装split与prune的核心函数。
     def adjust_gaussian(self, base_grad_threshold, update_value , min_opacity, cur_stage = 0, opacity_reduce_weight = 0.3, residual_split_scale_div = 1.6):
-
+        # update_value即为阈值调整公式中的系数α（α > 1）。
+        
         grads = self.xyz_gradient_accum_abs / self.denom
         grads[grads.isnan()] = 0
         grads_norm = torch.norm(grads, dim=-1)
     
         cur_grad_thresh = torch.ones((grads_norm.shape[0]),device="cuda").float() * base_grad_threshold
         if cur_stage is not -1:
+            # 筛选精细层级 < 当前子阶段k的高斯，以降低split阈值。
             level_mask = (self._level < cur_stage)
             base_pow = torch.ones((grads_norm[level_mask].shape[0]),device="cuda").float() * update_value
+            # 实现层次化的动态阈值调整公式
             cur_grad_thresh[level_mask] = cur_grad_thresh[level_mask] * torch.pow(base_pow, self._level[level_mask] - cur_stage)
+        #选择需要split的高斯
         add_child_mask = (grads_norm >= cur_grad_thresh)
 
         self.densify_residual_split(add_child_mask, opacity_reduce_weight = opacity_reduce_weight, residual_split_scale_div = residual_split_scale_div)
