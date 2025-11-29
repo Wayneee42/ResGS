@@ -461,20 +461,22 @@ class GaussianModel:
         self.max_radii2D = torch.cat([self.max_radii2D, torch.zeros((new_xyz.shape[0]), device="cuda")], dim=0)
         self.max_weight = torch.cat([self.max_weight, torch.zeros((new_xyz.shape[0], 1), device="cuda")], dim=0)
 
+    # Residual Split核心实现函数
     def densify_residual_split(self, selected_pts_mask, opacity_reduce_weight = 0.3, residual_split_scale_div = 1.6):
         stds = self.get_scaling[selected_pts_mask]
         means =torch.zeros((stds.size(0), 3),device="cuda")
-        samples = torch.normal(mean=means, std=stds)
+        samples = torch.normal(mean=means, std=stds) # 在原高斯概率分布采样
         rots = build_rotation(self._rotation[selected_pts_mask])
-        new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1) + self.get_xyz[selected_pts_mask]
+        new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1) + self.get_xyz[selected_pts_mask] # 位置基于原高斯概率分布
         new_scaling = self.scaling_inverse_activation(self.get_scaling[selected_pts_mask]/ residual_split_scale_div)
         new_rotation = self._rotation[selected_pts_mask]
         new_features_dc = self._features_dc[selected_pts_mask]
         new_features_rest = self._features_rest[selected_pts_mask]
         new_opacity = self._opacity[selected_pts_mask]
-        new_level = self._level[selected_pts_mask]
+        new_level = self._level[selected_pts_mask] # 继承原高斯精细度并+1
         new_level = new_level + 1
 
+        # 对原高斯做局部不透明度衰减
         self.reduce_opacity_with_mask(selected_pts_mask, opacity_reduce_weight = opacity_reduce_weight)
         self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation, new_level)
 
